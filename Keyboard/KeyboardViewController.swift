@@ -13,11 +13,13 @@ final class KeyboardViewController: UIInputViewController {
     private var clipboardButton: UIButton?
     private var statusLabel: UILabel?
 
-    private let numberKeys = Array("1234567890").map(String.init)
-    private let letterRows = [
-        Array("qwertyuiop").map(String.init),
-        Array("asdfghjkl").map(String.init),
-        Array("zxcvbnm").map(String.init)
+    private let numberKeys: [String] = [
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"
+    ]
+    private let letterRows: [[String]] = [
+        ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+        ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+        ["z", "x", "c", "v", "b", "n", "m"]
     ]
     private let symbolRows = [
         ["@", "#", "$", "%", "&", "-", "+", "(", ")", "/"],
@@ -54,7 +56,6 @@ final class KeyboardViewController: UIInputViewController {
         toolbar.addArrangedSubview(makeToolButton(title: "Düzelt", action: #selector(correctLastWord)))
 
         let clipboard = makeToolButton(title: "Pano", action: nil)
-        clipboard.menu = makeClipboardMenu()
         clipboard.showsMenuAsPrimaryAction = true
         clipboardButton = clipboard
         toolbar.addArrangedSubview(clipboard)
