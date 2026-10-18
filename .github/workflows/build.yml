@@ -11,19 +11,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Build Proper Keyboard Extension IPA
+      - name: Build Valid Signed IPA Structure
         run: |
-          # Ana uygulama ve klavye eklentisi (PlugIns) klasör yapısını oluştur
+          # Klasör yapısını oluştur
           mkdir -p Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex
           
-          # Swift kodunu klavye eklentisi olarak derle
+          # 1. Klavye eklentisini derle
           swiftc -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
                  -target arm64-apple-ios15.0 \
                  -emit-library \
                  Keyboard/KeyboardViewController.swift \
                  -o Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex/KeyboardExtension
           
-          # Ana uygulama Info.plist dosyası
+          # 2. Ana uygulama için GERÇEK bir binary derle (imzalama hatasını çözer)
+          echo 'print("App")' > main.swift
+          swiftc -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
+                 -target arm64-apple-ios15.0 \
+                 main.swift \
+                 -o Payload/CustomKeyboard.app/CustomKeyboardApp
+          rm main.swift
+          
+          # 3. Ana uygulama Info.plist
           cat << 'EOF' > Payload/CustomKeyboard.app/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,11 +55,7 @@ jobs:
           </plist>
           EOF
 
-          # Boş ana uygulama yürütülebilir dosyası oluştur (uygulama çökmesini önler)
-          touch Payload/CustomKeyboard.app/CustomKeyboardApp
-          chmod +x Payload/CustomKeyboard.app/CustomKeyboardApp
-
-          # Klavye Eklentisi (PlugIn) Info.plist dosyası (iOS'in klavyeyi tanıması için şart)
+          # 4. Klavye eklentisi Info.plist
           cat << 'EOF' > Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -93,7 +97,7 @@ jobs:
           </plist>
           EOF
 
-          # IPA Paketini Arşivle
+          # 5. IPA Paketini Arşivle
           zip -r CustomKeyboard.ipa Payload
 
       - name: Upload IPA Artifact
