@@ -65,8 +65,8 @@ jobs:
           test -f "$EXT/$EXT_BIN"
           file "$APP/$APP_BIN"
           file "$EXT/$EXT_BIN"
-          lipo -verify_arch arm64 "$APP/$APP_BIN"
-          lipo -verify_arch arm64 "$EXT/$EXT_BIN"
+          lipo "$APP/$APP_BIN" -verify_arch arm64
+          lipo "$EXT/$EXT_BIN" -verify_arch arm64
 
       - name: Package unsigned IPA for Sideloadly
         run: |
