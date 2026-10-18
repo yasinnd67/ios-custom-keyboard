@@ -171,32 +171,62 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func makeKeyButton(title: String, value: String, color: UIColor) -> UIButton {
-        let button = UIButton(type: .system)
+        // Use a custom button with explicit high-contrast text. This avoids
+        // inherited system button styling hiding titles in the keyboard host.
+        let button = UIButton(type: .custom)
         button.setTitle(title, for: .normal)
-        button.setTitleColor(.label, for: .normal)
+        button.setTitleColor(UIColor.black, for: .normal)
+        button.tintColor = UIColor.black
         button.titleLabel?.font = .systemFont(ofSize: title.count > 2 ? 13 : 19, weight: .regular)
+        button.titleLabel?.textColor = UIColor.black
+        button.titleLabel?.adjustsFontSizeToFitWidth = true
+        button.titleLabel?.minimumScaleFactor = 0.75
         button.backgroundColor = color
         button.layer.cornerRadius = 5
         button.accessibilityIdentifier = value
+        button.accessibilityLabel = title
+        button.isUserInteractionEnabled = true
+        button.addTarget(self, action: #selector(animateKeyDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(animateKeyUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         button.addTarget(self, action: #selector(handleKey(_:)), for: .touchUpInside)
         return button
     }
 
     private func makeToolButton(title: String, action: Selector?) -> UIButton {
-        let button = UIButton(type: .system)
+        let button = UIButton(type: .custom)
         button.setTitle(title, for: .normal)
-        button.setTitleColor(.white, for: .normal)
+        button.setTitleColor(UIColor.white, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        button.titleLabel?.adjustsFontSizeToFitWidth = true
+        button.titleLabel?.minimumScaleFactor = 0.8
         button.backgroundColor = accentColor
         button.layer.cornerRadius = 7
+        button.addTarget(self, action: #selector(animateKeyDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(animateKeyUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         if let action {
             button.addTarget(self, action: action, for: .touchUpInside)
         }
         return button
     }
 
+    @objc private func animateKeyDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.06, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            sender.transform = CGAffineTransform(scaleX: 0.93, y: 0.93)
+            sender.alpha = 0.78
+        }
+    }
+
+    @objc private func animateKeyUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.12, delay: 0, usingSpringWithDamping: 0.62, initialSpringVelocity: 0.2, options: [.beginFromCurrentState, .allowUserInteraction]) {
+            sender.transform = .identity
+            sender.alpha = 1
+        }
+    }
+
     @objc private func handleKey(_ sender: UIButton) {
         guard let value = sender.accessibilityIdentifier else { return }
+        UIDevice.current.playInputClick()
+        UISelectionFeedbackGenerator().selectionChanged()
         switch value {
         case "SHIFT":
             isShifted.toggle()
@@ -337,4 +367,8 @@ final class KeyboardViewController: UIInputViewController {
             self?.statusLabel?.text = ""
         }
     }
+}
+
+extension KeyboardViewController: UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
 }
