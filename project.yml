@@ -1,0 +1,62 @@
+name: CustomKeyboard
+options:
+  bundleIdPrefix: com.yasin
+  deploymentTarget:
+    iOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  CustomKeyboardApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    info:
+      path: Config/Generated-App-Info.plist
+      properties:
+        CFBundleDisplayName: "Özel Klavye"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yasin.customkeyboard
+        PRODUCT_NAME: CustomKeyboard
+    dependencies:
+      - target: KeyboardExtension
+        embed: true
+        codeSign: false
+  KeyboardExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Keyboard
+    info:
+      path: Config/Generated-Keyboard-Info.plist
+      properties:
+        CFBundleDisplayName: "Özel Klavye"
+        NSExtension:
+          NSExtensionAttributes:
+            IsASCIICapable: true
+            PrefersRightToLeft: false
+            PrimaryLanguage: "tr-TR"
+            RequestsOpenAccess: true
+          NSExtensionPointIdentifier: "com.apple.keyboard-service"
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).KeyboardViewController"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yasin.customkeyboard.keyboard
+        PRODUCT_NAME: KeyboardExtension
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+schemes:
+  CustomKeyboardApp:
+    build:
+      targets:
+        CustomKeyboardApp: all

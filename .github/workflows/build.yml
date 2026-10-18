@@ -2,106 +2,87 @@ name: Build iOS Keyboard IPA
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 25
     steps:
-      - name: Checkout Code
+      - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Build Valid Signed IPA Structure
+      - name: Select Xcode and install XcodeGen
         run: |
-          # Klasör yapısını oluştur
-          mkdir -p Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex
-          
-          # 1. Klavye eklentisini derle
-          swiftc -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-                 -target arm64-apple-ios15.0 \
-                 -emit-library \
-                 Keyboard/KeyboardViewController.swift \
-                 -o Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex/KeyboardExtension
-          
-          # 2. Ana uygulama için GERÇEK bir binary derle (imzalama hatasını çözer)
-          echo 'print("App")' > main.swift
-          swiftc -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-                 -target arm64-apple-ios15.0 \
-                 main.swift \
-                 -o Payload/CustomKeyboard.app/CustomKeyboardApp
-          rm main.swift
-          
-          # 3. Ana uygulama Info.plist
-          cat << 'EOF' > Payload/CustomKeyboard.app/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>CustomKeyboardApp</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.yasin.customkeyboard</string>
-              <key>CFBundleName</key>
-              <string>CustomKeyboard</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>MinimumOSVersion</key>
-              <string>15.0</string>
-          </dict>
-          </plist>
-          EOF
+          set -euo pipefail
+          xcodebuild -version
+          xcode-select -p
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen version
 
-          # 4. Klavye eklentisi Info.plist
-          cat << 'EOF' > Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>KeyboardExtension</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.yasin.customkeyboard.extension</string>
-              <key>CFBundleName</key>
-              <string>KeyboardExtension</string>
-              <key>CFBundlePackageType</key>
-              <string>XPC!</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>MinimumOSVersion</key>
-              <string>15.0</string>
-              <key>NSExtension</key>
-              <dict>
-                  <key>NSExtensionAttributes</key>
-                  <dict>
-                      <key>IsASCIICapable</key>
-                      <false/>
-                      <key>PrefersRightToLeft</key>
-                      <false/>
-                      <key>PrimaryLanguage</key>
-                      <string>tr</string>
-                      <key>RequestsOpenAccess</key>
-                      <true/>
-                  </dict>
-                  <key>NSExtensionPointIdentifier</key>
-                  <string>com.apple.keyboard-service</string>
-                  <key>NSExtensionPrincipalClass</key>
-                  <string>Keyboard.KeyboardViewController</string>
-              </dict>
-          </dict>
-          </plist>
-          EOF
+      - name: Generate the Xcode project
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          test -d CustomKeyboard.xcodeproj
 
-          # 5. IPA Paketini Arşivle
-          zip -r CustomKeyboard.ipa Payload
+      - name: Build app and keyboard extension
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project CustomKeyboard.xcodeproj \
+            -scheme CustomKeyboardApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
 
-      - name: Upload IPA Artifact
+      - name: Validate iOS app bundle before packaging
+        run: |
+          set -euo pipefail
+          APP="$PWD/build/Build/Products/Release-iphoneos/CustomKeyboard.app"
+          EXT="$APP/PlugIns/KeyboardExtension.appex"
+          test -d "$APP"
+          test -d "$EXT"
+          plutil -lint "$APP/Info.plist"
+          plutil -lint "$EXT/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$EXT/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$EXT/Info.plist" | grep -Fx 'com.apple.keyboard-service'
+          PRINCIPAL=$(/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPrincipalClass' "$EXT/Info.plist")
+          echo "Principal class: $PRINCIPAL"
+          test "$PRINCIPAL" = 'KeyboardExtension.KeyboardViewController'
+          APP_BIN=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          EXT_BIN=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$EXT/Info.plist")
+          test -f "$APP/$APP_BIN"
+          test -f "$EXT/$EXT_BIN"
+          file "$APP/$APP_BIN"
+          file "$EXT/$EXT_BIN"
+          lipo -verify_arch arm64 "$APP/$APP_BIN"
+          lipo -verify_arch arm64 "$EXT/$EXT_BIN"
+
+      - name: Package unsigned IPA for Sideloadly
+        run: |
+          set -euo pipefail
+          APP="$PWD/build/Build/Products/Release-iphoneos/CustomKeyboard.app"
+          mkdir -p package/Payload
+          ditto "$APP" package/Payload/CustomKeyboard.app
+          (cd package && /usr/bin/zip -qry "$GITHUB_WORKSPACE/CustomKeyboard.ipa" Payload)
+          test -s CustomKeyboard.ipa
+          unzip -t CustomKeyboard.ipa
+          unzip -l CustomKeyboard.ipa | grep -F 'Payload/CustomKeyboard.app/PlugIns/KeyboardExtension.appex/Info.plist'
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: CustomKeyboard-IPA
           path: CustomKeyboard.ipa
+          if-no-files-found: error
+          retention-days: 7
