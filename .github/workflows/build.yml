@@ -16,20 +16,18 @@ jobs:
           echo "Creating artifact directory..."
           mkdir -p output_keyboard
           
-          # Klavye kaynak dosyalarını zip veya klasör olarak paketle
+          # Klavye kaynak dosyalarını paketle
           cp -R Keyboard output_keyboard/
           
-          # Kurulum talimatı metni oluştur
           cat << 'EOF' > output_keyboard/README.txt
           Özel iOS Klavyeniz Hazır!
-          Bu klasör içindeki Swift dosyaları ve arayüz kodları başarıyla derlenmiştir.
+          Bu klasör içindeki Swift dosyaları ve arayüz kodları başarıyla hazırlandı.
           EOF
           
-          # Arşiv aracı
           zip -r CustomKeyboard_Source.zip output_keyboard
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: CustomKeyboard-Files
           path: CustomKeyboard_Source.zip
